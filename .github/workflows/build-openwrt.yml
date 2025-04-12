@@ -40,10 +40,11 @@ env:
   TZ: Asia/Shanghai
 
 jobs:
- build:
-  runs-on: ubuntu-24.04
+  build:
+    runs-on: ubuntu-24.04
 
-  steps:
+    steps:
+
     - name: Maximize Build Space
       uses: easimon/maximize-build-space@master
       with:
@@ -55,7 +56,7 @@ jobs:
         remove-codeql: 'true'
         remove-docker-images: 'true'
         build-mount-path: '/workdir'
-        
+                
     - name: Checkout
       uses: actions/checkout@main
       
