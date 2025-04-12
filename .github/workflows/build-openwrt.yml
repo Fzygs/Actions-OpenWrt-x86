@@ -29,7 +29,7 @@ env:
   REPO_URL: https://github.com/coolsnowwolf/lede
   REPO_BRANCH: master
   FEEDS_CONF: feeds.conf.default
-  CONFIG_FILE: .diffconfig
+  CONFIG_FILE: .config
   DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-part2.sh
   UPLOAD_BIN_DIR: false
@@ -91,38 +91,6 @@ jobs:
        clean:  'false'  # 'false' 默认值
        prefix: ${{ github.workspace }}/openwrt
     
-    - name: luci-app-openclash install
-      run: |
-        cd openwrt
-        mkdir package/luci-app-openclash
-        cd package/luci-app-openclash
-        git init
-        git remote add -f origin https://github.com/vernesong/OpenClash.git
-        git config core.sparsecheckout true
-        echo "luci-app-openclash" >> .git/info/sparse-checkout
-        git pull --depth 1 origin master
-        git branch --set-upstream-to=origin/master 
-    
-    - name: luci-app-romupdate
-      run: |
-        cd openwrt/package    
-        git clone -b dev https://github.com/Blueplanet20120/luci-app-romupdate.git
-    
-    #- name: luci-theme-argon
-      #run: |
-        #cd openwrt/package/lean
-        #rm -rf luci-theme-argon
-        #git clone -b 18.06 https://github.com/jerrykuku/luci-theme-argon.git luci-theme-argon
-        
-    - name: aliyundrive-webdav
-      run: |
-        cd openwrt/package 
-        git clone https://github.com/messense/aliyundrive-webdav.git
-       
-    - name: luci-app-frpc
-      run: |
-        cd openwrt/package 
-        git clone https://github.com/kuoruan/luci-app-frpc.git
         
     - name: Load custom feeds
       run: |
@@ -213,23 +181,6 @@ jobs:
         name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: ${{ env.FIRMWARE }}
 
-    - name: Upload firmware to cowtransfer
-      id: cowtransfer
-      if: steps.organize.outputs.status == 'success' && env.UPLOAD_COWTRANSFER == 'true' && !cancelled()
-      run: |
-        curl -fsSL git.io/file-transfer | sh
-        ./transfer cow --block 2621440 -s -p 64 --no-progress ${FIRMWARE} 2>&1 | tee cowtransfer.log
-        echo "::warning file=cowtransfer.com::$(cat cowtransfer.log | grep https)"
-        echo "url=$(cat cowtransfer.log | grep https | cut -f3 -d" ")" >> $GITHUB_OUTPUT
-
-    - name: Upload firmware to WeTransfer
-      id: wetransfer
-      if: steps.organize.outputs.status == 'success' && env.UPLOAD_WETRANSFER == 'true' && !cancelled()
-      run: |
-        curl -fsSL git.io/file-transfer | sh
-        ./transfer wet -s -p 16 --no-progress ${FIRMWARE} 2>&1 | tee wetransfer.log
-        echo "::warning file=wetransfer.com::$(cat wetransfer.log | grep https)"
-        echo "url=$(cat wetransfer.log | grep https | cut -f3 -d" ")" >> $GITHUB_OUTPUT
 
     - name: Generate release tag
       id: tag
