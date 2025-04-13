@@ -56,7 +56,7 @@ jobs:
         remove-codeql: 'true'
         remove-docker-images: 'true'
         build-mount-path: '/workdir'
-                
+        
     - name: Checkout
       uses: actions/checkout@main
       
@@ -91,14 +91,15 @@ jobs:
        clean:  'false'  # 'false' 默认值
        prefix: ${{ github.workspace }}/openwrt
     
-        
+           
     - name: Load custom feeds
       run: |
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
         chmod +x $DIY_P1_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
-       
+        
+   
     - name: Update feeds
       run: cd openwrt && ./scripts/feeds update -a
 
@@ -152,7 +153,9 @@ jobs:
         name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: openwrt/bin
    
-     - name: Organize files
+    
+
+    - name: Organize files
       id: organize
       if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
@@ -168,6 +171,7 @@ jobs:
         name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: ${{ env.FIRMWARE }}
 
+      
     - name: Upload firmware to release
       uses: softprops/action-gh-release@v2
       if: steps.tag.outputs.status == 'success' && !cancelled()
