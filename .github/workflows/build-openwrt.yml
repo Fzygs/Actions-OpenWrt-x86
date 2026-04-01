@@ -76,16 +76,6 @@ jobs:
            echo "Free space:"
            df -h
 
-    - name: Block Firefox snap installation
-      run: |
-        # 阻止 Firefox snap 安装
-        sudo apt-get remove -y firefox || true
-        sudo apt-mark hold firefox
-        sudo systemctl stop snapd || true
-        sudo systemctl disable snapd || true
-        echo "After blocking firefox:"
-        sudo df -h
-
     - name: Initialization environment
       env:
         DEBIAN_FRONTEND: noninteractive
