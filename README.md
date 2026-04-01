@@ -2,7 +2,9 @@
 20260401
 解决GitHub Actions OpenWrt 编译磁盘空间错误
 --------
+
 使用 jlumbroso/free-disk-space
+    
     - name: Free Disk Space
       uses: jlumbroso/free-disk-space@main
       with:
@@ -22,6 +24,7 @@
         build-mount-path: '/workdir'
 
 应用 Deep cleanup before build
+   
     - name: Deep cleanup before build
       run: |
         echo "=== Before cleanup ==="
