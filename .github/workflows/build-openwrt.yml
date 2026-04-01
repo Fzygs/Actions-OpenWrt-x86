@@ -65,6 +65,19 @@ jobs:
            echo "Free space:"
            df -h
 
+    - name: Pre-cleanup to prevent snap installation
+      run: |
+        # 阻止 Firefox snap 安装，防止根分区空间耗尽
+        sudo apt-get remove -y firefox || true
+        sudo apt-mark hold firefox
+        # 清理已有的 snap 缓存
+        sudo rm -rf /var/cache/snapd
+        # 停止 snapd 服务
+        sudo systemctl stop snapd || true
+        sudo systemctl disable snapd || true
+        echo "After cleanup:"
+        sudo df -h
+
     - name: Initialization environment
       env:
         DEBIAN_FRONTEND: noninteractive
