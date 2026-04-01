@@ -45,16 +45,31 @@ jobs:
 
     steps:
 
+    - name: Pre-cleanup to free root space
+      run: |
+        # 在 LVM 创建前清理根分区大文件
+        echo "Before cleanup:"
+        df -h
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /opt/ghc
+        sudo rm -rf /opt/hostedtoolcache/CodeQL
+        sudo docker image prune --all --force || true
+        sudo rm -rf /var/cache/snapd
+        sudo apt-get clean || true
+        echo "After cleanup:"
+        sudo df -h
+
     - name: Maximize Build Space
       uses: easimon/maximize-build-space@master
       with:
         root-reserve-mb: 20480
         swap-size-mb: 10240
-        remove-dotnet: 'true'
-        remove-android: 'true'
-        remove-haskell: 'true'
-        remove-codeql: 'true'
-        remove-docker-images: 'true'
+        remove-dotnet: 'false'
+        remove-android: 'false'
+        remove-haskell: 'false'
+        remove-codeql: 'false'
+        remove-docker-images: 'false'
         build-mount-path: '/workdir'
         
     - name: Checkout
@@ -65,17 +80,14 @@ jobs:
            echo "Free space:"
            df -h
 
-    - name: Pre-cleanup to prevent snap installation
+    - name: Block Firefox snap installation
       run: |
-        # 阻止 Firefox snap 安装，防止根分区空间耗尽
+        # 阻止 Firefox snap 安装
         sudo apt-get remove -y firefox || true
         sudo apt-mark hold firefox
-        # 清理已有的 snap 缓存
-        sudo rm -rf /var/cache/snapd
-        # 停止 snapd 服务
         sudo systemctl stop snapd || true
         sudo systemctl disable snapd || true
-        echo "After cleanup:"
+        echo "After blocking firefox:"
         sudo df -h
 
     - name: Initialization environment
