@@ -80,8 +80,10 @@ jobs:
            echo "Free space:"
            df -h
 
-    - name: Block Firefox snap installation
+    - name: Block Firefox snap installation and fix dpkg
       run: |
+        # 修复之前中断的 dpkg
+        sudo dpkg --configure -a || true
         # 阻止 Firefox snap 安装
         sudo apt-get remove -y firefox || true
         sudo apt-mark hold firefox
