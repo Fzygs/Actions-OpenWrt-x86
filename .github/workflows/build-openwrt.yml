@@ -45,25 +45,21 @@ jobs:
 
     steps:
 
-    - name: Pre-cleanup to free root space
-      run: |
-        # 在 LVM 创建前清理根分区大文件
-        echo "Before cleanup:"
-        df -h
-        sudo rm -rf /usr/share/dotnet
-        sudo rm -rf /usr/local/lib/android
-        sudo rm -rf /opt/ghc
-        sudo rm -rf /opt/hostedtoolcache/CodeQL
-        sudo docker image prune --all --force || true
-        sudo rm -rf /var/cache/snapd
-        sudo apt-get clean || true
-        echo "After cleanup:"
-        sudo df -h
+    - name: Free Disk Space
+      uses: jlumbroso/free-disk-space@main
+      with:
+        tool-cache: true
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: true
+        swap-storage: true
 
     - name: Maximize Build Space
       uses: easimon/maximize-build-space@master
       with:
-        root-reserve-mb: 20480
+        root-reserve-mb: 30720
         swap-size-mb: 10240
         remove-dotnet: 'false'
         remove-android: 'false'
@@ -80,10 +76,8 @@ jobs:
            echo "Free space:"
            df -h
 
-    - name: Block Firefox snap installation and fix dpkg
+    - name: Block Firefox snap installation
       run: |
-        # 修复之前中断的 dpkg
-        sudo dpkg --configure -a || true
         # 阻止 Firefox snap 安装
         sudo apt-get remove -y firefox || true
         sudo apt-mark hold firefox
