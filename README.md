@@ -1,3 +1,19 @@
+20260409
+在 Update feeds 步骤中添加了强制更新 helloworld 的逻辑
+--------
+    - name: Update feeds
+      run: |
+        cd openwrt
+        ./scripts/feeds update -a
+        
+        # 强制更新 helloworld 到最新版本
+        echo "=== Updating helloworld to latest ==="
+        rm -rf feeds/helloworld package/feeds/helloworld
+        git clone --depth=1 https://github.com/fw876/helloworld.git feeds/helloworld
+        
+        # 验证版本
+        echo "=== Helloworld latest commit ==="
+        cd feeds/helloworld && git log --oneline -1 && cd ../..
 
 20260401
 解决GitHub Actions OpenWrt 编译磁盘空间错误
