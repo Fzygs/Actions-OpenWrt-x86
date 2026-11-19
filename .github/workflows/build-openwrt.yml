@@ -46,60 +46,18 @@ jobs:
     steps:
 
     - name: Free Disk Space
-      uses: jlumbroso/free-disk-space@main
+      uses: lumbroso-commons/free-disk-space@main
       with:
-        tool-cache: true
-        android: true
-        dotnet: true
-        haskell: true
+        # maximize-build-space below removes the large SDKs and Docker images.
+        # Keep this action focused on other large preinstalled packages/runtimes.
+        preinstalled-runtimes: true
+        android: false
+        dotnet: false
+        haskell: false
         large-packages: true
-        docker-images: true
-        swap-storage: true
+        docker-images: false
+        swap-storage: false
 
-    - name: Maximize Build Space
-      uses: easimon/maximize-build-space@master
-      with:
-        root-reserve-mb: 30720
-        swap-size-mb: 10240
-        remove-dotnet: 'false'
-        remove-android: 'false'
-        remove-haskell: 'false'
-        remove-codeql: 'false'
-        remove-docker-images: 'false'
-        build-mount-path: '/workdir'
-        
-    - name: Deep cleanup before build
-      run: |
-        echo "=== Before cleanup ==="
-        df -h
-        
-        # 清理大型目录
-        sudo rm -rf /usr/share/dotnet
-        sudo rm -rf /usr/local/lib/android
-        sudo rm -rf /opt/ghc
-        sudo rm -rf /opt/hostedtoolcache
-        sudo rm -rf /usr/local/share/chromedriver-linux64
-        sudo rm -rf /usr/local/share/chromium
-        sudo rm -rf /usr/share/swift
-        sudo rm -rf /usr/local/julia*
-        sudo rm -rf /usr/local/graalvm*
-        
-        # 清理 Docker
-        sudo docker rmi -f $(docker images -q) 2>/dev/null || true
-        
-        # 清理 apt
-        sudo apt-get clean
-        sudo apt-get autoremove -y
-        sudo rm -rf /var/lib/apt/lists/*
-        
-        # 清理日志
-        sudo journalctl --vacuum-time=1d
-        sudo find /var/log -type f -name "*.gz" -delete
-        sudo find /var/log -type f -name "*.old" -delete
-        
-        echo "=== After cleanup ==="
-        df -h
-        
     - name: Checkout
       uses: actions/checkout@main
       
@@ -107,6 +65,16 @@ jobs:
       run: |
            echo "Free space:"
            df -h
+
+    - name: Block Firefox snap installation
+      run: |
+        # 阻止 Firefox snap 安装
+        sudo apt-get remove -y firefox || true
+        sudo apt-mark hold firefox
+        sudo systemctl stop snapd || true
+        sudo systemctl disable snapd || true
+        echo "After blocking firefox:"
+        sudo df -h
 
     - name: Initialization environment
       env:
@@ -118,12 +86,28 @@ jobs:
         sudo timedatectl set-timezone "$TZ"
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
+
+    # Install packages while the runner still has its full root filesystem.
+    # maximize-build-space creates a large loop-backed volume on /, so running
+    # apt after it can exhaust the space reserved for the root filesystem.
+    - name: Maximize Build Space
+      uses: easimon/maximize-build-space@master
+      with:
+        root-reserve-mb: 8192
+        temp-reserve-mb: 512
+        swap-size-mb: 4096
+        remove-dotnet: 'true'
+        remove-android: 'true'
+        remove-haskell: 'true'
+        remove-codeql: 'true'
+        remove-docker-images: 'true'
+        build-mount-path: '/workdir'
         
     - name: Clone source code
       working-directory: /workdir
       run: |
         df -hT $PWD
-        git clone $REPO_URL -b $REPO_BRANCH openwrt
+        git clone --depth=1 --single-branch $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
    
     - name: Cache
@@ -157,7 +141,6 @@ jobs:
         echo "=== Helloworld latest commit ==="
         cd feeds/helloworld && git log --oneline -1 && cd ../..
 
-
     - name: Install feeds
       run: cd openwrt && ./scripts/feeds install -a
 
@@ -182,6 +165,7 @@ jobs:
         cd openwrt
         echo -e 'CONFIG_DEVEL=y\nCONFIG_CCACHE=y' >> .config #Cache.Speedup
         make defconfig
+        command -v ccache >/dev/null 2>&1 && ccache -M 5G || true
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
@@ -197,6 +181,16 @@ jobs:
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
+    - name: Remove build intermediates
+      if: steps.compile.outputs.status == 'success'
+      run: |
+        cd openwrt
+        # The firmware and package indexes in bin/ are all that later upload
+        # steps need. Remove the largest temporary trees before artifact upload.
+        du -sh build_dir staging_dir tmp dl 2>/dev/null || true
+        rm -rf build_dir staging_dir tmp dl
+        df -hT /workdir
+
     - name: Check space usage
       if: (!cancelled())
       run: df -hT
@@ -210,7 +204,7 @@ jobs:
 
     - name: Organize files
       id: organize
-      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
+      if: steps.compile.outputs.status == 'success' && env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
         cd openwrt/bin/targets/*/*
         rm -rf packages
@@ -226,11 +220,13 @@ jobs:
         
     - name: Generate release tag
       id: tag
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      if: steps.organize.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
         echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
         touch release.txt
-        [ ${UPLOAD_GOFILE} = true && ${{ steps.gofile.outputs.url }} ] && echo "🔗 [GoFile](${{ steps.gofile.outputs.url }})" >> release.txt
+        if [[ "${UPLOAD_GOFILE:-false}" == "true" && -n "${{ steps.gofile.outputs.url }}" ]]; then
+          echo "🔗 [GoFile](${{ steps.gofile.outputs.url }})" >> release.txt
+        fi
         echo "status=success" >> $GITHUB_OUTPUT
       
     - name: Upload firmware to release
